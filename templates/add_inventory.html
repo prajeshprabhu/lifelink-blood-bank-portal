@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block heading %}Add Blood Donation / Inventory{% endblock %}
+{% block content %}
+<section class="card">
+  <form id="donationForm">
+    <div class="form-grid">
+      <div class="field"><label>Donor Name</label><input name="donor_name" required></div>
+      <div class="field"><label>Donor Phone Number</label><input name="donor_phone" placeholder="+91 9876543210" required></div>
+      <div class="field"><label>Blood Group</label><select name="blood_group" required>{% for g in ["A+","A-","B+","B-","AB+","AB-","O+","O-"] %}<option>{{g}}</option>{% endfor %}</select></div>
+      <div class="field"><label>Number of Units Collected</label><input name="units_collected" type="number" min="1" required></div>
+      <div class="field"><label>City</label><input name="city" required></div>
+      <div class="field"><label>Source of Donation</label><select name="source" required>{% for s in ["Direct Blood Donation","Blood Donation Camp","Hospital","Blood Bank Transfer","Other"] %}<option>{{s}}</option>{% endfor %}</select></div>
+      <div class="field"><label>Donation Date</label><input name="donation_date" type="date" required></div>
+      <div class="field"><label>Collection Date</label><input name="collection_date" type="date" required></div>
+      <div class="field"><label>Expiry Date</label><input name="expiry_date" type="date" required></div>
+      <div class="field"><label>Component Type</label><select name="component_type" required>{% for c in ["Whole Blood","Red Blood Cells","Platelets","Plasma"] %}<option>{{c}}</option>{% endfor %}</select></div>
+      <div class="field full"><label>Additional Remarks</label><textarea name="remarks"></textarea></div>
+    </div>
+    <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+      <button type="reset" class="btn btn-secondary">Clear</button>
+      <button type="submit" class="btn"><i data-lucide="save"></i> Save Donation</button>
+    </div>
+  </form>
+</section>
+<script>
+const today=new Date().toISOString().slice(0,10);
+document.querySelector('[name="donation_date"]').value=today;
+document.querySelector('[name="collection_date"]').value=today;
+document.getElementById("donationForm").addEventListener("submit",async event=>{
+  event.preventDefault();
+  try{
+    const body=Object.fromEntries(new FormData(event.target));
+    body.units_collected=Number(body.units_collected);
+    const data=await api("/api/inventory",{method:"POST",body:JSON.stringify(body)});
+    notify(`Donation batch #${data.inventory_id} was created successfully`);
+    event.target.reset();
+  }catch(error){notify(error.message,true)}
+});
+</script>
+{% endblock %}

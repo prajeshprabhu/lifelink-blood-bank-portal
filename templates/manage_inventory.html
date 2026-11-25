@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block heading %}Manage Blood Inventory{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="toolbar">
+    <input id="search" placeholder="Search ID, donor or phone">
+    <select id="bloodGroup"><option value="">All blood groups</option>{% for g in ["A+","A-","B+","B-","AB+","AB-","O+","O-"] %}<option>{{g}}</option>{% endfor %}</select>
+    <input id="cityFilter" placeholder="City">
+    <select id="sourceFilter"><option value="">All sources</option>{% for s in ["Direct Blood Donation","Blood Donation Camp","Hospital","Blood Bank Transfer","Other"] %}<option>{{s}}</option>{% endfor %}</select>
+    <select id="componentFilter"><option value="">All components</option>{% for c in ["Whole Blood","Red Blood Cells","Platelets","Plasma"] %}<option>{{c}}</option>{% endfor %}</select>
+    <select id="statusFilter"><option value="">All statuses</option><option>Available</option><option>Partially Reserved</option><option>Reserved</option><option>Unavailable</option><option>Expired</option></select>
+    <input id="collectionFrom" type="date" title="Collection date from">
+    <input id="collectionTo" type="date" title="Collection date to">
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>Inventory ID</th><th>Donor</th><th>Phone</th><th>Group</th><th>Collected</th><th>Available</th><th>Reserved</th><th>City</th><th>Source</th><th>Dates</th><th>Component</th><th>Status</th><th>Actions</th></tr></thead><tbody id="inventoryRows"></tbody></table></div>
+  <div class="pagination"><button class="btn btn-secondary btn-small" id="prev">Previous</button><button class="btn btn-secondary btn-small" id="next">Next</button></div>
+</section>
+<dialog id="unitsDialog" style="border:0;border-radius:12px;padding:20px;width:min(420px,calc(100% - 30px))">
+  <form id="unitsForm">
+    <h3>Update Available Units</h3>
+    <div class="field"><label>Available Units</label><input id="availableUnits" type="number" min="0" required></div>
+    <div class="field" style="margin-top:12px"><label>Change Reason</label><input id="changeReason" value="Available units updated"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button type="button" class="btn btn-secondary" onclick="unitsDialog.close()">Cancel</button><button class="btn" type="submit">Save</button></div>
+  </form>
+</dialog>
+<script>
+let page=1, editingId=null;
+async function loadInventory(){
+  const params=new URLSearchParams({page,per_page:10});
+  const search=document.getElementById("search").value;if(search)params.set("search",search);
+  const bg=document.getElementById("bloodGroup").value;if(bg)params.set("blood_group",bg);
+  const city=document.getElementById("cityFilter").value;if(city)params.set("city",city);
+  const status=document.getElementById("statusFilter").value;if(status)params.set("status",status);
+  const source=document.getElementById("sourceFilter").value;if(source)params.set("source",source);
+  const component=document.getElementById("componentFilter").value;if(component)params.set("component_type",component);
+  const collectionFrom=document.getElementById("collectionFrom").value;if(collectionFrom)params.set("collection_from",collectionFrom);
+  const collectionTo=document.getElementById("collectionTo").value;if(collectionTo)params.set("collection_to",collectionTo);
+  try{
+    const data=await api("/api/inventory?"+params);
+    document.getElementById("inventoryRows").innerHTML=data.inventory.map(r=>{
+      const status=r.status.toLowerCase().replace(" ","-");
+      return `<tr><td>#${r.id}</td><td>${r.donor_name}</td><td>${r.donor_phone}</td><td><strong>${r.blood_group}</strong></td><td>${r.units_collected}</td><td>${r.available_units}</td><td>${r.reserved_units}</td><td>${r.city}</td><td>${r.source}</td><td>${r.collection_date}<br><small>Expires ${r.expiry_date}</small></td><td>${r.component_type}</td><td><span class="badge ${status}">${r.status}</span></td><td><div class="actions"><button class="btn btn-secondary btn-small" onclick="viewDetails(${r.id})">View</button><button class="btn btn-secondary btn-small" onclick="openUnits(${r.id},${r.available_units})">Units</button><button class="btn btn-small" onclick="reserve(${r.id})">Reserve</button><button class="btn btn-danger btn-small" onclick="makeUnavailable(${r.id})">Unavailable</button></div></td></tr>`;
+    }).join("")||'<tr><td colspan="13">No inventory batches found</td></tr>';
+  }catch(error){notify(error.message,true)}
+}
+function openUnits(id,units){editingId=id;document.getElementById("availableUnits").value=units;unitsDialog.showModal()}
+document.getElementById("unitsForm").addEventListener("submit",async event=>{
+  event.preventDefault();
+  try{
+    await api(`/api/inventory/${editingId}`,{method:"PUT",body:JSON.stringify({available_units:Number(document.getElementById("availableUnits").value),change_reason:document.getElementById("changeReason").value})});
+    unitsDialog.close();notify("Available units updated");loadInventory();
+  }catch(error){notify(error.message,true)}
+});
+async function reserve(id){const units=prompt("Number of units to reserve");if(!units)return;if(!confirm(`Reserve ${units} units?`))return;try{await api(`/api/inventory/${id}/reserve`,{method:"POST",body:JSON.stringify({units:Number(units)})});notify("Units reserved");loadInventory()}catch(error){notify(error.message,true)}}
+async function viewDetails(id){try{const data=await api(`/api/inventory/${id}`);const r=data.inventory;alert(`Inventory #${r.id}\\nDonor: ${r.donor_name}\\nBlood group: ${r.blood_group}\\nComponent: ${r.component_type}\\nCollected: ${r.units_collected}\\nAvailable: ${r.available_units}\\nReserved: ${r.reserved_units}\\nCity: ${r.city}\\nSource: ${r.source}\\nCollection: ${r.collection_date}\\nExpiry: ${r.expiry_date}\\nStatus: ${r.status}\\nRemarks: ${r.remarks||"None"}`)}catch(error){notify(error.message,true)}}
+async function makeUnavailable(id){if(!confirm("Mark this inventory batch unavailable?"))return;try{await api(`/api/inventory/${id}/unavailable`,{method:"POST",body:"{}"});notify("Inventory marked unavailable");loadInventory()}catch(error){notify(error.message,true)}}
+["search","bloodGroup","cityFilter","sourceFilter","componentFilter","statusFilter","collectionFrom","collectionTo"].forEach(id=>document.getElementById(id).addEventListener("change",()=>{page=1;loadInventory()}));
+document.getElementById("search").addEventListener("keyup",()=>{page=1;loadInventory()});
+document.getElementById("prev").onclick=()=>{if(page>1){page--;loadInventory()}};
+document.getElementById("next").onclick=()=>{page++;loadInventory()};
+loadInventory();
+</script>
+{% endblock %}

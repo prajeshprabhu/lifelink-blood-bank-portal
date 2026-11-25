@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% set active="docs" %}
+{% block heading %}LifeLink API Documentation{% endblock %}
+{% block content %}
+<section class="card">
+  <h2>Authentication</h2>
+  <p>LifeLink service requests must send: <code>Authorization: Bearer &lt;LIFELINK_API_SECRET&gt;</code></p>
+  <h2>Endpoints</h2>
+  <table><thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr></thead><tbody>
+    <tr><td>GET</td><td>/api/v1/inventory</td><td>Fetch eligible available inventory</td></tr>
+    <tr><td>GET</td><td>/api/v1/inventory/availability</td><td>Get aggregate available units without deduction</td></tr>
+    <tr><td>POST</td><td>/api/v1/inventory</td><td>Authorized inventory creation</td></tr>
+    <tr><td>PUT</td><td>/api/v1/inventory/{id}</td><td>Authorized inventory quantity update</td></tr>
+    <tr><td>GET</td><td>/api/v1/blood-bank/profile</td><td>Public blood bank profile</td></tr>
+  </tbody></table>
+</section>
+<section class="card" style="margin-top:16px">
+  <h2>Example Availability Request</h2>
+  <pre class="code">GET /api/v1/inventory/availability?blood_group=O%2B&amp;city=Mangaluru
+Authorization: Bearer YOUR_API_SECRET</pre>
+  <pre class="code">{
+  "success": true,
+  "blood_group": "O+",
+  "city": "Mangaluru",
+  "component_type": "Any",
+  "total_available_units": 5,
+  "blood_bank": {"name": "Demo Blood Bank", "city": "Mangaluru"}
+}</pre>
+</section>
+<section class="card" style="margin-top:16px">
+  <h2>Python requests example</h2>
+  <pre class="code">import requests
+
+response = requests.get(
+    "https://blood-bank.example/api/v1/inventory/availability",
+    params={"blood_group": "O+", "city": "Mangaluru"},
+    headers={"Authorization": "Bearer YOUR_API_SECRET"},
+    timeout=10,
+)
+response.raise_for_status()
+availability = response.json()</pre>
+</section>
+<section class="card" style="margin-top:16px">
+  <h2>Error Responses</h2>
+  <pre class="code">401 {"success": false, "error": "Unauthorized"}
+400 {"success": false, "error": "blood_group is required"}</pre>
+  <p>Availability checks are read-only and never deduct stock. Reservations and confirmed transactions must use a separately authorized workflow and update inventory atomically.</p>
+</section>
+{% endblock %}

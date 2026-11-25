@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block heading %}Blood Bank Profile{% endblock %}
+{% block content %}
+<section class="card" style="max-width:800px">
+  <form id="profileForm">
+    <div class="form-grid">
+      <div class="field"><label>Blood Bank Name</label><input name="blood_bank_name" required></div>
+      <div class="field"><label>Email</label><input name="email" type="email" required></div>
+      <div class="field"><label>Phone</label><input name="phone" required></div>
+      <div class="field"><label>City</label><input name="city" required></div>
+      <div class="field"><label>State</label><input name="state" required></div>
+      <div class="field full"><label>Address</label><textarea name="address" required></textarea></div>
+    </div>
+    <div style="margin-top:18px;text-align:right"><button class="btn" type="submit"><i data-lucide="save"></i> Save Profile</button></div>
+  </form>
+</section>
+<script>
+fetch("/api/profile").then(r=>r.json()).then(data=>{
+ if(!data.profile)return;
+ for(const [key,value] of Object.entries(data.profile)){
+  const field=document.querySelector(`[name="${key}"]`);
+  if(field)field.value=value||"";
+ }
+});
+document.getElementById("profileForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ try{
+  await api("/api/profile",{method:"PUT",body:JSON.stringify(Object.fromEntries(new FormData(event.target)))});
+  notify("Blood bank profile saved");
+ }catch(error){notify(error.message,true)}
+});
+</script>
+{% endblock %}

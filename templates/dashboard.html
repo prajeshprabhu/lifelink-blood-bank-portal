@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - LifeLink{% endblock %}
+{% block heading %}Blood Inventory Dashboard{% endblock %}
+{% block content %}
+<div class="cards" id="summaryCards"></div>
+<div class="grid-2">
+  <section class="card"><h2>Blood Group-wise Available Stock</h2><div id="stockChart"></div></section>
+  <section class="card"><h2>Recent Inventory Updates</h2><div class="table-wrap"><table><thead><tr><th>ID</th><th>Group</th><th>Units</th><th>Reason</th></tr></thead><tbody id="historyRows"></tbody></table></div></section>
+</div>
+<div class="grid-3">
+  <section class="card"><h3>Recent Donations</h3><div id="recentDonations"></div></section>
+  <section class="card"><h3>Low-stock Alerts</h3><div id="lowStock"></div></section>
+  <section class="card"><h3>Expiry Alerts</h3><div id="expiryAlerts"></div></section>
+</div>
+<script>
+fetch("/api/dashboard").then(r=>r.json()).then(data=>{
+  const s=data.summary;
+  const cards=[
+    ["Total Blood Units",s.total_units,"droplets"],["Available Units",s.available_units,"circle-check"],["Reserved Units",s.reserved_units,"bookmark"],
+    ["Expired Units",s.expired_batches,"triangle-alert"],["Donation Records",s.total_donations,"clipboard-plus"]
+  ];
+  document.getElementById("summaryCards").innerHTML=cards.map(([label,value,icon])=>`
+    <article class="card stat-card"><div><small>${label}</small><strong>${value||0}</strong></div><span class="icon"><i data-lucide="${icon}"></i></span></article>`).join("");
+  const groups=["A+","A-","B+","B-","AB+","AB-","O+","O-"];
+  const map=Object.fromEntries(data.stock.map(x=>[x.blood_group,x.available_units]));
+  const max=Math.max(1,...groups.map(g=>map[g]||0));
+  document.getElementById("stockChart").innerHTML=groups.map(g=>{
+    const value=map[g]||0;
+    return `<div style="margin:10px 0"><div style="display:flex;justify-content:space-between;font-size:13px"><strong>${g}</strong><span>${value} units</span></div><div class="stock-bar"><span style="width:${value/max*100}%"></span></div></div>`;
+  }).join("");
+  document.getElementById("historyRows").innerHTML=data.history.map(h=>`<tr><td>#${h.inventory_id}</td><td>${h.blood_group}</td><td>${h.updated_units}</td><td>${h.change_reason}</td></tr>`).join("")||'<tr><td colspan="4">No updates</td></tr>';
+  document.getElementById("recentDonations").innerHTML=data.recent_donations.map(r=>`<p><strong>${r.blood_group}</strong> · ${r.available_units} units<br><small>${r.collection_date}</small></p>`).join("")||"<p>No donations yet</p>";
+  document.getElementById("lowStock").innerHTML=data.low_stock.map(r=>`<p><strong>${r.blood_group}</strong> · ${r.available_units} units left<br><small>${r.city}</small></p>`).join("")||"<p>No low-stock alerts</p>";
+  const expiry=[...data.near_expiry.map(r=>`<p><strong>${r.blood_group}</strong> expires ${r.expiry_date}<br><small>${r.available_units} units</small></p>`),...data.expired.map(r=>`<p><strong>${r.blood_group}</strong> expired ${r.expiry_date}<br><small>Expired batch</small></p>`)];
+  document.getElementById("expiryAlerts").innerHTML=expiry.join("")||"<p>No expiry alerts</p>";
+  lucide.createIcons();
+}).catch(()=>notify("Could not load dashboard data",true));
+</script>
+{% endblock %}

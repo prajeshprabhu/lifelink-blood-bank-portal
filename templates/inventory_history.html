@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block heading %}Inventory History{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="table-wrap"><table><thead><tr><th>Inventory ID</th><th>Blood Group</th><th>Component</th><th>Previous Units</th><th>Updated Units</th><th>Previous Status</th><th>Updated Status</th><th>Change Reason</th><th>Changed At</th></tr></thead><tbody id="historyRows"></tbody></table></div>
+</section>
+<script>
+fetch("/api/inventory/history").then(r=>r.json()).then(data=>{
+ document.getElementById("historyRows").innerHTML=data.history.map(h=>`<tr><td>#${h.inventory_id}</td><td>${h.blood_group}</td><td>${h.component_type}</td><td>${h.previous_units}</td><td>${h.updated_units}</td><td>${h.previous_status}</td><td>${h.updated_status}</td><td>${h.change_reason}</td><td>${h.changed_at}</td></tr>`).join("")||'<tr><td colspan="9">No history records</td></tr>';
+}).catch(()=>notify("Could not load inventory history",true));
+</script>
+{% endblock %}
