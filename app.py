@@ -9,7 +9,6 @@ from routes.auth_routes import auth_bp
 from routes.dashboard_routes import dashboard_bp
 from routes.inventory_routes import inventory_bp
 from routes.api_routes import api_bp
-from routes.profile_routes import profile_bp
 from utils.decorators import jwt_required_dashboard
 
 
@@ -29,7 +28,6 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(inventory_bp)
     app.register_blueprint(api_bp)
-    app.register_blueprint(profile_bp)
 
     initialize_schema()
     initialize_admin()

@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
-from database import fetch_all, fetch_one
+from flask_jwt_extended.exceptions import JWTExtendedException
+from jwt.exceptions import InvalidTokenError
 from services.inventory_service import refresh_expired_statuses
 from utils.decorators import jwt_required_dashboard
 from database import get_connection
@@ -13,33 +14,84 @@ def dashboard_data():
     try:
         cursor = conn.cursor(dictionary=True)
         refresh_expired_statuses(cursor)
-        cursor.execute(
-            """
-            SELECT
-              COALESCE(SUM(units_collected),0) AS total_units,
-              COALESCE(SUM(available_units),0) AS available_units,
-              COALESCE(SUM(reserved_units),0) AS reserved_units,
-              COALESCE(SUM(CASE WHEN status='Expired' THEN units_collected ELSE 0 END),0) AS expired_batches
-            FROM inventory
-            """
-        )
-        summary = cursor.fetchone()
-        cursor.execute("SELECT COUNT(*) AS total FROM inventory_history WHERE change_reason='Donation batch added'")
-        donations = cursor.fetchone()["total"]
+        conn.commit()
         cursor.execute(
             """
             SELECT blood_group,
-                   COALESCE(SUM(available_units),0) AS available_units
+                   COALESCE(SUM(units_collected),0) AS total_units,
+                   COALESCE(SUM(CASE WHEN status <> 'Expired'
+                                     THEN available_units ELSE 0 END),0) AS available_units,
+                   COALESCE(SUM(reserved_units),0) AS reserved_units,
+                   COALESCE(SUM(CASE WHEN status='Expired'
+                                     THEN units_collected ELSE 0 END),0) AS expired_batches,
+                   COALESCE(SUM(CASE WHEN status <> 'Expired' THEN 1 ELSE 0 END),0) AS active_batches,
+                   (SELECT COUNT(*) FROM inventory_history
+                    WHERE change_reason='Donation batch added') AS total_donations
             FROM inventory
-            WHERE status <> 'Expired'
-            GROUP BY blood_group
+            GROUP BY blood_group WITH ROLLUP
             """
         )
-        stock = cursor.fetchall()
-        cursor.execute(
-            "SELECT * FROM inventory ORDER BY created_at DESC LIMIT 5"
+        summary = None
+        stock = []
+        for row in cursor.fetchall():
+            if row["blood_group"] is None:
+                summary = {
+                    "total_units": row["total_units"],
+                    "available_units": row["available_units"],
+                    "reserved_units": row["reserved_units"],
+                    "expired_batches": row["expired_batches"],
+                    "total_donations": row["total_donations"],
+                }
+            elif row["active_batches"]:
+                stock.append(
+                    {
+                        "blood_group": row["blood_group"],
+                        "available_units": row["available_units"],
+                    }
+                )
+        if summary is None:
+            summary = {
+                "total_units": 0,
+                "available_units": 0,
+                "reserved_units": 0,
+                "expired_batches": 0,
+                "total_donations": 0,
+            }
+
+        inventory_sections = (
+            (
+                "recent_donations",
+                "SELECT * FROM inventory ORDER BY created_at DESC LIMIT 5",
+            ),
+            (
+                "low_stock",
+                "SELECT * FROM inventory WHERE status <> 'Expired' "
+                "AND available_units < 5 ORDER BY available_units ASC LIMIT 10",
+            ),
+            (
+                "near_expiry",
+                "SELECT * FROM inventory WHERE status <> 'Expired' "
+                "AND expiry_date BETWEEN CURDATE() "
+                "AND DATE_ADD(CURDATE(), INTERVAL 30 DAY) "
+                "ORDER BY expiry_date ASC LIMIT 10",
+            ),
+            (
+                "expired",
+                "SELECT * FROM inventory WHERE status='Expired' "
+                "ORDER BY expiry_date DESC LIMIT 10",
+            ),
         )
-        recent_donations = cursor.fetchall()
+        inventory_sql = " UNION ALL ".join(
+            "SELECT %s AS section, selected_inventory.* "
+            f"FROM ({query}) AS selected_inventory"
+            for _, query in inventory_sections
+        )
+        cursor.execute(inventory_sql, tuple(name for name, _ in inventory_sections))
+        inventories = {name: [] for name, _ in inventory_sections}
+        for row in cursor.fetchall():
+            section = row.pop("section")
+            inventories[section].append(row)
+
         cursor.execute(
             """
             SELECT h.*, i.blood_group
@@ -49,38 +101,22 @@ def dashboard_data():
             """
         )
         history = cursor.fetchall()
-        cursor.execute(
-            """
-            SELECT * FROM inventory
-            WHERE status <> 'Expired'
-              AND available_units < 5
-            ORDER BY available_units ASC LIMIT 10
-            """
+        inventories["recent_donations"].sort(
+            key=lambda row: row["created_at"], reverse=True
         )
-        low_stock = cursor.fetchall()
-        cursor.execute(
-            """
-            SELECT * FROM inventory
-            WHERE status <> 'Expired'
-              AND expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-            ORDER BY expiry_date ASC LIMIT 10
-            """
+        inventories["low_stock"].sort(key=lambda row: row["available_units"])
+        inventories["near_expiry"].sort(key=lambda row: row["expiry_date"])
+        inventories["expired"].sort(
+            key=lambda row: row["expiry_date"], reverse=True
         )
-        near_expiry = cursor.fetchall()
-        cursor.execute(
-            "SELECT * FROM inventory WHERE status='Expired' ORDER BY expiry_date DESC LIMIT 10"
-        )
-        expired = cursor.fetchall()
-        conn.commit()
-        summary["total_donations"] = donations
         return {
             "summary": summary,
             "stock": stock,
-            "recent_donations": recent_donations,
+            "recent_donations": inventories["recent_donations"],
             "history": history,
-            "low_stock": low_stock,
-            "near_expiry": near_expiry,
-            "expired": expired,
+            "low_stock": inventories["low_stock"],
+            "near_expiry": inventories["near_expiry"],
+            "expired": inventories["expired"],
         }
     finally:
         conn.close()
@@ -88,7 +124,10 @@ def dashboard_data():
 
 @dashboard_bp.get("/")
 def dashboard():
-    verify_jwt_in_request(optional=True)
+    try:
+        verify_jwt_in_request(optional=True)
+    except (JWTExtendedException, InvalidTokenError):
+        return redirect(url_for("auth.login_page"))
     if not get_jwt_identity():
         return redirect(url_for("auth.login_page"))
     return render_template("dashboard.html")

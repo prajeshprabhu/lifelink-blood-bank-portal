@@ -20,7 +20,7 @@ function notify(message, isError = false) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  if (window.lucide) lucide.createIcons();
+  if (window.renderIcons) renderIcons();
   document.getElementById("mobileMenu")?.addEventListener("click", () => {
     document.getElementById("sidebar").classList.toggle("open");
   });

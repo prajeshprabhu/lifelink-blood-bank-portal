@@ -33,7 +33,7 @@ fetch("/api/dashboard").then(r=>r.json()).then(data=>{
   document.getElementById("lowStock").innerHTML=data.low_stock.map(r=>`<p><strong>${r.blood_group}</strong> · ${r.available_units} units left<br><small>${r.city}</small></p>`).join("")||"<p>No low-stock alerts</p>";
   const expiry=[...data.near_expiry.map(r=>`<p><strong>${r.blood_group}</strong> expires ${r.expiry_date}<br><small>${r.available_units} units</small></p>`),...data.expired.map(r=>`<p><strong>${r.blood_group}</strong> expired ${r.expiry_date}<br><small>Expired batch</small></p>`)];
   document.getElementById("expiryAlerts").innerHTML=expiry.join("")||"<p>No expiry alerts</p>";
-  lucide.createIcons();
+  if(window.renderIcons)renderIcons();
 }).catch(()=>notify("Could not load dashboard data",true));
 </script>
 {% endblock %}

@@ -1,8 +1,9 @@
 import re
-from datetime import date
+from datetime import date, timedelta
 
 BLOOD_GROUPS = {"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"}
 COMPONENT_TYPES = {"Whole Blood", "Red Blood Cells", "Platelets", "Plasma"}
+WHOLE_BLOOD_EXPIRY_DAYS = 42
 SOURCES = {
     "Direct Blood Donation", "Blood Donation Camp", "Hospital",
     "Blood Bank Transfer", "Other",
@@ -22,9 +23,8 @@ def validate_inventory(payload, require_all=True):
         raise ValueError("Request body must be a JSON object")
 
     required = [
-        "blood_group", "component_type", "units_collected", "donor_name",
-        "donor_phone", "city", "source", "donation_date", "collection_date",
-        "expiry_date",
+        "blood_group", "units_collected", "donor_name", "donor_phone",
+        "city", "source", "donation_date",
     ]
     if require_all:
         missing = [field for field in required if payload.get(field) in (None, "")]
@@ -33,7 +33,8 @@ def validate_inventory(payload, require_all=True):
 
     if payload.get("blood_group") not in BLOOD_GROUPS:
         raise ValueError("Invalid blood group")
-    if payload.get("component_type") not in COMPONENT_TYPES:
+    component_type = payload.get("component_type", "Whole Blood")
+    if component_type not in COMPONENT_TYPES:
         raise ValueError("Invalid component type")
     if payload.get("source") not in SOURCES:
         raise ValueError("Invalid donation source")
@@ -50,8 +51,15 @@ def validate_inventory(payload, require_all=True):
         raise ValueError("Units collected must be a positive integer")
 
     donation = parse_date(payload["donation_date"], "Donation date")
-    collection = parse_date(payload["collection_date"], "Collection date")
-    expiry = parse_date(payload["expiry_date"], "Expiry date")
+    collection = parse_date(
+        payload.get("collection_date", donation), "Collection date"
+    )
+    expiry = parse_date(
+        payload.get(
+            "expiry_date", donation + timedelta(days=WHOLE_BLOOD_EXPIRY_DAYS)
+        ),
+        "Expiry date",
+    )
     if donation > collection:
         raise ValueError("Donation date cannot be after collection date")
     if expiry <= collection:
@@ -64,7 +72,7 @@ def validate_inventory(payload, require_all=True):
 
     return {
         "blood_group": payload["blood_group"].strip(),
-        "component_type": payload["component_type"].strip(),
+        "component_type": component_type.strip(),
         "units_collected": units,
         "donor_name": str(payload["donor_name"]).strip(),
         "donor_phone": phone,

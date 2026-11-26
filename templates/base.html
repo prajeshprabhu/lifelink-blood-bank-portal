@@ -6,7 +6,8 @@
   <title>{% block title %}LifeLink Blood Bank{% endblock %}</title>
   <link rel="icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script defer src="{{ url_for('static', filename='js/icons.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </head>
 <body>
 <div class="app">
@@ -16,9 +17,7 @@
       <a href="/" class="{% if active=='dashboard' %}active{% endif %}"><i data-lucide="layout-dashboard"></i> Dashboard</a>
       <a href="/inventory/add" class="{% if active=='add' %}active{% endif %}"><i data-lucide="circle-plus"></i> Add Donation</a>
       <a href="/inventory/manage" class="{% if active=='manage' %}active{% endif %}"><i data-lucide="package"></i> Manage Inventory</a>
-      <a href="/inventory/history" class="{% if active=='history' %}active{% endif %}"><i data-lucide="history"></i> Inventory History</a>
       <a href="/api-documentation" class="{% if active=='docs' %}active{% endif %}"><i data-lucide="book-open"></i> API Documentation</a>
-      <a href="/profile" class="{% if active=='profile' %}active{% endif %}"><i data-lucide="building-2"></i> Blood Bank Profile</a>
     </nav>
     <div class="sidebar-footer">
       <a class="nav" href="#" id="logout"><i data-lucide="log-out"></i> Logout</a>
@@ -35,6 +34,5 @@
     <div class="content">{% block content %}{% endblock %}</div>
   </main>
 </div>
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

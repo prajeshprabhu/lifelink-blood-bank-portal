@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify
-from database import fetch_all, fetch_one, get_connection
+from database import fetch_one, get_connection
 from utils.decorators import jwt_required_dashboard
 from utils.validators import validate_inventory
 from services.inventory_service import create_inventory, update_inventory_units
@@ -17,12 +17,6 @@ def add_page():
 @jwt_required_dashboard
 def manage_page():
     return render_template("manage_inventory.html")
-
-
-@inventory_bp.get("/inventory/history")
-@jwt_required_dashboard
-def history_page():
-    return render_template("inventory_history.html")
 
 
 @inventory_bp.post("/api/inventory")
@@ -77,8 +71,6 @@ def list_inventory():
         params.extend([term, term, term])
 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
-    count_params = list(params)
-    total = fetch_one("SELECT COUNT(*) AS total FROM inventory" + where, tuple(count_params))["total"]
     allowed_sort = {
         "id": "id", "blood_group": "blood_group", "available_units": "available_units",
         "collection_date": "collection_date", "expiry_date": "expiry_date",
@@ -86,11 +78,27 @@ def list_inventory():
     }
     sort = allowed_sort.get(request.args.get("sort"), "created_at")
     direction = "ASC" if request.args.get("direction") == "asc" else "DESC"
-    rows = fetch_all(
-        "SELECT * FROM inventory" + where +
-        f" ORDER BY {sort} {direction} LIMIT %s OFFSET %s",
-        tuple(params + [per_page, offset]),
-    )
+    conn = get_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT inventory.*, COUNT(*) OVER() AS total_rows FROM inventory" + where
+            + f" ORDER BY {sort} {direction} LIMIT %s OFFSET %s",
+            tuple(params + [per_page, offset]),
+        )
+        rows = cursor.fetchall()
+        if rows:
+            total = rows[0]["total_rows"]
+            for row in rows:
+                row.pop("total_rows")
+        else:
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM inventory" + where,
+                tuple(params),
+            )
+            total = cursor.fetchone()["total"]
+    finally:
+        conn.close()
     return jsonify(success=True, inventory=rows, total=total, page=page, per_page=per_page)
 
 
@@ -113,7 +121,6 @@ def update_inventory(inventory_id):
         return jsonify(success=True, status=status)
     except ValueError as exc:
         return jsonify(success=False, error=str(exc)), 400
-
 
 @inventory_bp.get("/api/inventory/<int:inventory_id>")
 @jwt_required_dashboard
@@ -169,17 +176,3 @@ def unavailable_inventory(inventory_id):
         return jsonify(success=True, status=status)
     except ValueError as exc:
         return jsonify(success=False, error=str(exc)), 400
-
-
-@inventory_bp.get("/api/inventory/history")
-@jwt_required_dashboard
-def history_api():
-    rows = fetch_all(
-        """
-        SELECT h.*, i.blood_group, i.component_type
-        FROM inventory_history h
-        JOIN inventory i ON i.id=h.inventory_id
-        ORDER BY h.changed_at DESC LIMIT 500
-        """
-    )
-    return jsonify(success=True, history=rows)
