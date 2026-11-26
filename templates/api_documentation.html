@@ -4,13 +4,13 @@
 {% block content %}
 <section class="card">
   <h2>Authentication</h2>
-  <p>LifeLink service requests must send: <code>Authorization: Bearer &lt;LIFELINK_API_SECRET&gt;</code></p>
+  <p>Read-only inventory and profile endpoints are public and do not require a key. Inventory creation and quantity updates require: <code>Authorization: Bearer &lt;LIFELINK_API_SECRET&gt;</code></p>
   <h2>Endpoints</h2>
   <table><thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr></thead><tbody>
-    <tr><td>GET</td><td>/api/v1/inventory</td><td>Fetch eligible available inventory</td></tr>
-    <tr><td>GET</td><td>/api/v1/inventory/availability</td><td>Get aggregate available units without deduction</td></tr>
-    <tr><td>POST</td><td>/api/v1/inventory</td><td>Authorized inventory creation</td></tr>
-    <tr><td>PUT</td><td>/api/v1/inventory/{id}</td><td>Authorized inventory quantity update</td></tr>
+    <tr><td>GET</td><td>/api/v1/inventory</td><td>Public: fetch eligible available inventory</td></tr>
+    <tr><td>GET</td><td>/api/v1/inventory/availability</td><td>Public: get aggregate available units without deduction</td></tr>
+    <tr><td>POST</td><td>/api/v1/inventory</td><td>Create inventory; bearer key required</td></tr>
+    <tr><td>PUT</td><td>/api/v1/inventory/{id}</td><td>Update inventory quantity; bearer key required</td></tr>
     <tr><td>GET</td><td>/api/v1/blood-bank/profile</td><td>Public blood bank profile</td></tr>
   </tbody></table>
   <p>For inventory creation, omitted component type defaults to Whole Blood, collection date defaults to donation date, and expiry defaults to 42 days after donation date.</p>
@@ -18,7 +18,7 @@
 <section class="card" style="margin-top:16px">
   <h2>Example Availability Request</h2>
   <pre class="code">GET /api/v1/inventory/availability?blood_group=O%2B&amp;city=Mangaluru
-Authorization: Bearer YOUR_API_SECRET</pre>
+No API key required</pre>
   <pre class="code">{
   "success": true,
   "blood_group": "O+",
@@ -45,6 +45,6 @@ availability = response.json()</pre>
   <h2>Error Responses</h2>
   <pre class="code">401 {"success": false, "error": "Unauthorized"}
 400 {"success": false, "error": "blood_group is required"}</pre>
-  <p>Availability checks are read-only and never deduct stock. Reservations and confirmed transactions must use a separately authorized workflow and update inventory atomically.</p>
+  <p>Availability checks are read-only and never deduct stock. Inventory creation and quantity changes remain protected by the bearer key. Reservations and confirmed transactions must use a separately authorized workflow and update inventory atomically.</p>
 </section>
 {% endblock %}

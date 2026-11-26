@@ -52,14 +52,13 @@ import requests
 response = requests.get(
     "https://blood-bank.example/api/v1/inventory/availability",
     params={"blood_group": "O+", "city": "Mangaluru"},
-    headers={"Authorization": "Bearer YOUR_API_SECRET"},
     timeout=10,
 )
 response.raise_for_status()
 print(response.json())
 ```
 
-Availability checks do not deduct stock. Inventory POST/PUT operations require the LifeLink bearer secret. Dashboard routes use a secure HTTP-only JWT cookie.
+Read-only inventory, availability, and blood-bank profile endpoints are public. Availability checks do not deduct stock. Inventory POST/PUT operations require the `LIFELINK_API_SECRET` bearer key. Dashboard routes use a secure HTTP-only JWT cookie.
 
 ## API tests
 

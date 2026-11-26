@@ -23,7 +23,6 @@ def log_api(response_status):
 
 
 @api_bp.get("/inventory")
-@lifelink_api_required
 def public_inventory():
     conditions = ["expiry_date >= %s"]
     params = [date.today()]
@@ -76,7 +75,6 @@ def public_inventory():
 
 
 @api_bp.get("/inventory/availability")
-@lifelink_api_required
 def availability():
     blood_group = request.args.get("blood_group")
     city = request.args.get("city")
@@ -153,7 +151,6 @@ def update_via_api(inventory_id):
 
 
 @api_bp.get("/blood-bank/profile")
-@lifelink_api_required
 def profile():
     profile = public_profile()
     log_api(200)
