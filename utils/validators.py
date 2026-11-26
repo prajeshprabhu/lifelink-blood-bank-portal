@@ -83,3 +83,29 @@ def validate_inventory(payload, require_all=True):
         "expiry_date": expiry,
         "remarks": str(payload.get("remarks", "")).strip(),
     }
+
+
+def validate_blood_bank_profile(payload):
+    if not isinstance(payload, dict):
+        raise ValueError("Request body must be a JSON object")
+
+    fields = {
+        "blood_bank_name": 255,
+        "phone": 30,
+        "city": 100,
+    }
+    profile = {}
+    for field, max_length in fields.items():
+        value = payload.get(field)
+        label = field.replace("_", " ").capitalize()
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{label} is required")
+        value = value.strip()
+        if len(value) > max_length:
+            raise ValueError(f"{label} must be {max_length} characters or fewer")
+        profile[field] = value
+
+    if not re.fullmatch(r"\+?[0-9][0-9\- ]{5,27}[0-9]", profile["phone"]):
+        raise ValueError("Phone must be a valid phone number")
+
+    return profile

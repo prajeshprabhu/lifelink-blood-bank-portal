@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% set active="profile" %}
+{% block title %}Blood Bank Profile | LifeLink{% endblock %}
+{% block heading %}Blood Bank Profile{% endblock %}
+{% block content %}
+<section class="card">
+  <h2>Profile details</h2>
+  <p>Update the contact information shown to people and services using your public blood bank profile.</p>
+  <form id="profileForm">
+    <div class="form-grid">
+      <div class="field"><label for="blood_bank_name">Blood bank name</label><input id="blood_bank_name" name="blood_bank_name" maxlength="255" value="{{ profile.get('blood_bank_name', '') }}" required></div>
+      <div class="field"><label for="phone">Phone number</label><input id="phone" name="phone" type="tel" maxlength="30" value="{{ profile.get('phone', '') }}" required></div>
+      <div class="field"><label for="city">City</label>
+        <select id="city" name="city" required>
+          {% for city in ["Mangalore", "Udupi", "Bengaluru", "Mysuru", "Hubballi", "Belagavi", "Shivamogga"] %}
+          <option value="{{ city }}" {% if profile.get('city', 'Mangalore') == city %}selected{% endif %}>{{ city }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:18px;display:flex;justify-content:flex-end">
+      <button type="submit" class="btn" id="saveProfile">Save Profile</button>
+    </div>
+  </form>
+</section>
+<script>
+const profileForm=document.getElementById("profileForm");
+const saveButton=document.getElementById("saveProfile");
+profileForm.addEventListener("submit",async event=>{
+  event.preventDefault();
+  saveButton.disabled=true;
+  saveButton.setAttribute("aria-busy","true");
+  saveButton.textContent="Saving...";
+  try{
+    const profile=Object.fromEntries(new FormData(profileForm));
+    await api("/api/dashboard/profile",{method:"PUT",body:JSON.stringify(profile)});
+    notify("Blood bank profile saved");
+  }catch(error){notify(error.message,true)}
+  finally{
+    saveButton.disabled=false;
+    saveButton.removeAttribute("aria-busy");
+    saveButton.textContent="Save Profile";
+  }
+});
+</script>
+{% endblock %}
